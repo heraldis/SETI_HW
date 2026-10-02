@@ -6,7 +6,6 @@ HOST = "hw1.alexbers.com"
 USER = "user=955ce0824bff0ae7b7a01eb55cb62e9b"
 
 ACTIONS = [
-    "Для старта прохождения задания выставьте в cookie по ключу <code>user</code> свой идентификатор и обновите страницу.",
     "Отправьте POST-запрос по адресу",
     "Отправьте GET-запрос по адресу",
     "Загрузите файлы по адресу",
@@ -44,10 +43,13 @@ def extract_table_pairs(start_pos: int, tr_pattern: re.Pattern, page: str):
 
 
 def send_start_request() -> bytes:
-    return b"""GET / HTTP/1.1\r\n
-Host: hw1.alexbers.com\r\n
-Cookie: user=955ce0824bff0ae7b7a01eb55cb62e9b\r\n
-Connection: close\r\n\r\n"""
+    lines = [
+            "GET / HTTP/1.1",
+            f"Host: {HOST}",
+            f"Cookie: {USER}",
+            # "Connection: close",
+        ]
+    return ("\r\n".join(lines) + "\r\n\r\n").encode()
 
 
 def send_request(req: dict):
@@ -71,23 +73,23 @@ def send_request(req: dict):
         headers.append(f"Content-Length: {len(req['body'])}")
         if req["ctype"]:
             headers.append(f"Content-Type: {req['ctype']}")
-    headers.append("Connection: close")
+    # headers.append("Connection: close")
 
     request_bytes = "\r\n".join(headers).encode("utf-8") + b"\r\n\r\n" + req["body"]
     return request_bytes
 
 
 def get_response(s: socket.SocketType) -> str:
-    s.settimeout(20)
+    # s.settimeout(100)
     response = b""
-    try:
-        while True:
-            chunk = s.recv(4096)
-            if not chunk:
-                break
-            response += chunk
-    except socket.timeout:
-        print("Timeout error")
+    # try:
+    while True:
+        chunk = s.recv(4096)
+        if not chunk:
+            break
+        response += chunk
+    # except socket.timeout:
+    #     print("Timeout error")
 
     print(response.decode(errors="ignore"))
     return response.decode(errors="ignore")
@@ -163,17 +165,26 @@ def parse_html(page: str) -> dict:
 
     return req
 
-
+print("Start request")
 with socket.create_connection(("hw1.alexbers.com", 80)) as s:
+    print("Start connected")
     s.sendall(send_start_request())
+    print("Start sent")
     page = get_response(s)
+print("First page fetched")
 
 while True:
+    print("Page fetched")
+    if not page.strip():
+        print("Empty page")
+        break
     data = parse_html(page)
     if not data:
-        print("Fetching pages interrupted")
+        print("Fetching pages interrupted. Last response:")
+        print(ascii(page))
         break
     raw_tx = send_request(data)
     with socket.create_connection((HOST, 80)) as s:
         s.sendall(raw_tx)
+        print("Request sent")
         page = get_response(s)
