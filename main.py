@@ -20,6 +20,9 @@ SECTIONS = {
     "Загрузите файлы по адресу": "files",
 }
 
+TD_PATTERN = r"<td><code>(.*?)</code></td>"
+TR_PATTERN = re.compile(rf"<tr>\s*{TD_PATTERN}\s*{TD_PATTERN}\s*</tr>", re.S | re.I)
+
 
 def encode(s: str) -> str:
     res = ""
@@ -32,9 +35,9 @@ def encode(s: str) -> str:
     return res
 
 
-def extract_table_pairs(start_pos: int, tr_pattern: re.Pattern, page: str):
+def extract_table_pairs(start_pos: int, page: str):
     end_pos = page.find("</table>", start_pos)
-    pairs = tr_pattern.findall(page[start_pos:end_pos])
+    pairs = TR_PATTERN.findall(page[start_pos:end_pos])
     return [
         (html.unescape(k.strip()), html.unescape(v.strip()))
         for k, v in pairs
@@ -47,7 +50,7 @@ def send_start_request() -> bytes:
             "GET / HTTP/1.1",
             f"Host: {HOST}",
             f"Cookie: {USER}",
-            # "Connection: close",
+            "Connection: close",
         ]
     return ("\r\n".join(lines) + "\r\n\r\n").encode()
 
@@ -73,23 +76,23 @@ def send_request(req: dict):
         headers.append(f"Content-Length: {len(req['body'])}")
         if req["ctype"]:
             headers.append(f"Content-Type: {req['ctype']}")
-    # headers.append("Connection: close")
+    headers.append("Connection: close")
 
     request_bytes = "\r\n".join(headers).encode("utf-8") + b"\r\n\r\n" + req["body"]
     return request_bytes
 
 
 def get_response(s: socket.SocketType) -> str:
-    # s.settimeout(100)
+    s.settimeout(100)
     response = b""
-    # try:
-    while True:
-        chunk = s.recv(4096)
-        if not chunk:
-            break
-        response += chunk
-    # except socket.timeout:
-    #     print("Timeout error")
+    try:
+        while True:
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            response += chunk
+    except socket.timeout:
+        print("Timeout error")
 
     print(response.decode(errors="ignore"))
     return response.decode(errors="ignore")
@@ -130,15 +133,11 @@ def parse_html(page: str) -> dict:
     if address:
         req["path"] = html.unescape(address.group(1)).strip()
 
-    # page patterns
-    td_pattern = r"<td><code>(.*?)</code></td>"
-    tr_pattern = re.compile(rf"<tr>{td_pattern}{td_pattern}</tr>", re.S | re.I)
-
     # data to insert
     for sectn, field in SECTIONS.items():
         start = page.find(sectn)
         if start != -1:
-            req[field] = extract_table_pairs(start, tr_pattern, page)
+            req[field] = extract_table_pairs(start, page)
 
     if req["form"]:
         req["body"] = "&".join(
@@ -178,11 +177,12 @@ while True:
     if not page.strip():
         print("Empty page")
         break
+
     data = parse_html(page)
     if not data:
-        print("Fetching pages interrupted. Last response:")
-        print(ascii(page))
+        print("Fetching pages interrupted")
         break
+
     raw_tx = send_request(data)
     with socket.create_connection((HOST, 80)) as s:
         s.sendall(raw_tx)
