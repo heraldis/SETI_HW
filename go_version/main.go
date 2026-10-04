@@ -51,7 +51,7 @@ var sections = map[string]string{
 
 func encode(s string) string {
 	res := ""
-	for i := range s {
+	for i := 0; i < len(s); i++ {
 		b := s[i]
 		if b > 127 {
 			res += fmt.Sprintf("%%%02X", b)
@@ -173,9 +173,9 @@ func parse_html(page string) request_data {
 	}
 
 	for sectn, field := range sections {
-		start := strings.Index(page[action_idx:], sectn)
+		start := strings.Index(page, sectn)
 		if start != -1 {
-			pairs := extract_table_pairs(start+action_idx, page)
+			pairs := extract_table_pairs(start, page)
 
 			switch field {
 			case "headers":
@@ -206,11 +206,11 @@ func parse_html(page string) request_data {
 		for _, pair := range req.files {
 			s := ("--" + boundary + "\r\n" +
 				fmt.Sprintf("Content-Disposition: form-data; name=\"%[1]s\"; filename=\"%[1]s\"\r\n", pair.key) +
-				"Content-Type: application/octet-stream`" +
+				"Content-Type: application/octet-stream\r\n\r\n" +
 				pair.value + "\r\n")
 			parts = append(parts, []byte(s)...)
 		}
-		parts = append(parts, fmt.Appendf(nil, `--%s--\r\n`, boundary)...)
+		parts = append(parts, fmt.Appendf(nil, "--%s--\r\n", boundary)...)
 		req.body = parts
 		req.ctype = fmt.Sprintf("multipart/form-data; boundary=%s", boundary)
 	}
