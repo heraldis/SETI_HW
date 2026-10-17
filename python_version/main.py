@@ -41,7 +41,6 @@ def extract_table_pairs(start_pos: int, page: str):
     return [
         (html.unescape(k.strip()), html.unescape(v.strip()))
         for k, v in pairs
-        if "<th>" not in k
     ]
 
 
@@ -67,9 +66,8 @@ def send_request(req: dict):
         headers.append(f"{k}: {v}")
 
     cookies_list = [USER]
-    if req["cookies"]:
-        for k, v in req["cookies"]:
-            cookies_list.append(f"{k}={v}")
+    for k, v in req["cookies"]:
+        cookies_list.append(f"{k}={v}")
     headers.append(f"Cookie: {'; '.join(cookies_list)}")
 
     if req["body"]:

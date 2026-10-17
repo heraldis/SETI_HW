@@ -69,10 +69,7 @@ func extract_table_pairs(start int, page string) []key_value {
 	for _, pair := range pairs {
 		k := html.UnescapeString(strings.TrimSpace(pair[1]))
 		v := html.UnescapeString(strings.TrimSpace(pair[2]))
-		if !strings.Contains(k, "<th>") {
-			s := key_value{key: k, value: v}
-			res = append(res, s)
-		}
+		res = append(res, key_value{key: k, value: v})
 	}
 
 	return res
