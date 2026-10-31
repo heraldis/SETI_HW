@@ -92,8 +92,8 @@ def get_response(s: socket.SocketType) -> str:
     except socket.timeout:
         print("Timeout error")
 
-    print(response.decode(errors="ignore"))
-    return response.decode(errors="ignore")
+    print(response.decode())
+    return response.decode()
 
 
 def parse_html(page: str) -> dict:

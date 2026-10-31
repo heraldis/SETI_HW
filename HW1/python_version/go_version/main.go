@@ -104,7 +104,7 @@ func send_request(req request_data) []byte {
 		headers = append(headers, fmt.Sprintf("%s: %s", pair.key, pair.value))
 	}
 
-	cookies := []string{fmt.Sprintf("%s", user)}
+	cookies := []string{user}
 	for _, pair := range req.cookies {
 		cookies = append(cookies, fmt.Sprintf("%s=%s", pair.key, pair.value))
 	}
