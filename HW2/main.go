@@ -97,10 +97,6 @@ func main() {
 				}
 
 				nsResp := unpackMessage(rootRespBuf[:rootN])
-				println("received response from", ns)
-				println("answers:", nsResp.Header.ANCount)
-				println("authorities:", nsResp.Header.NSCCount)
-				println("additionals:", nsResp.Header.ARCount)
 				rcode := nsResp.Header.Flags & 0x000F
 
 				hasTargetAnswer := false
@@ -131,7 +127,6 @@ func main() {
 				break
 			}
 
-			println("next NS count:", len(nextNS))
 			if len(nextNS) == 0 {
 				break
 			}
