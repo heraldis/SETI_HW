@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/binary"
+	"fmt"
 	"net"
+	"time"
 )
 
 func packMessage(msg dnsMessage) []byte {
@@ -37,8 +40,8 @@ func unpackMessage(data []byte) *dnsMessage {
 
 	offset := 12
 	for i := 0; i < int(msg.Header.QDCount); i++ {
-		name, next := decodeQuestionName(data, offset)
-		offset = next
+		name, nextOffset := decodeQuestionName(data, offset)
+		offset = nextOffset
 
 		q := question{
 			Name:  name,
@@ -56,87 +59,102 @@ func unpackMessage(data []byte) *dnsMessage {
 	return msg
 }
 
+func askDomain(dialer *net.Dialer, timeout context.Context, ns string, question question) (*dnsMessage, []byte, error) {
+	conn, err := dialer.DialContext(timeout, "udp", net.JoinHostPort(ns, "53"))
+	if err != nil {
+		return nil, nil, err
+	}
+	defer conn.Close()
+
+	deadline, _ := timeout.Deadline()
+	conn.SetDeadline(deadline)
+
+	n, err := conn.Write(packMessage(sendMsg(question)))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	respBuff := make([]byte, 2048)
+	n, err = conn.Read(respBuff)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return unpackMessage(respBuff[:n]), respBuff[:n], nil
+}
+
+func isAnswer(answers []resourceRecord, ttype uint16) bool {
+	for _, ans := range answers {
+		if ans.Type == ttype {
+			return true
+		}
+	}
+	return false
+}
+
+func resolve(dialer *net.Dialer, clientQuery *dnsMessage) []byte {
+	timeout, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	currentNS := []string{ROOTSERVER}
+
+	for timeout.Err() == nil {
+		nextNS := []string{}
+		for _, ns := range currentNS {
+
+			nsResp, rawResp, err := askDomain(dialer, timeout, ns, clientQuery.Questions[0])
+			if err != nil {
+				continue
+			}
+			codeResp := nsResp.Header.Flags & 0x000F
+
+			if isAnswer(nsResp.Answers, clientQuery.Questions[0].Type) || codeResp == NXDOMAIN {
+				binary.BigEndian.PutUint16(rawResp[:2], clientQuery.Header.ID)
+				return rawResp
+			}
+
+			for _, add := range nsResp.Additionals {
+				if add.Type == 1 && add.RDLength == 4 {
+					nextNS = append(nextNS, net.IP(add.RData).String())
+				}
+			}
+		}
+
+		currentNS = nextNS
+		if len(nextNS) == 0 {
+			break
+		}
+	}
+
+	return packMessage(buildErrorResponse(clientQuery, SERVFAIL))
+}
+
 func main() {
-	conn, _ := net.ListenUDP("udp", &net.UDPAddr{
-		IP:   net.ParseIP("127.0.0.1"),
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{
+		IP:   net.ParseIP("0.0.0.0"),
 		Port: 53,
 	})
+	if err != nil {
+		fmt.Printf("Connection failed")
+		return
+	}
+
+	defer conn.Close()
+	dialer := net.Dialer{}
 
 	for {
-		buff := make([]byte, 1024)
-		n, clientAddr, _ := conn.ReadFromUDP(buff)
+		buff := make([]byte, 512)
+		n, clientAddr, err := conn.ReadFromUDP(buff)
+		if err != nil {
+			continue
+		}
 
 		clientQuery := unpackMessage(buff[:n])
 		if len(clientQuery.Questions) == 0 {
 			continue
 		}
 
-		currentNS := []string{"198.41.0.4"}
-		resolved := false
-
-		for range 10 {
-			nextNS := []string{}
-
-			for _, ns := range currentNS {
-				rootConn, err := net.Dial("udp", ns+":53")
-				if err != nil {
-					continue
-				}
-
-				_, err = rootConn.Write(packMessage(sendMsg(clientQuery.Questions[0])))
-				if err != nil {
-					rootConn.Close()
-					continue
-				}
-
-				rootRespBuf := make([]byte, 2048)
-				rootN, err := rootConn.Read(rootRespBuf)
-				rootConn.Close()
-				if err != nil {
-					continue
-				}
-
-				nsResp := unpackMessage(rootRespBuf[:rootN])
-				rcode := nsResp.Header.Flags & 0x000F
-
-				hasTargetAnswer := false
-				if nsResp.Header.ANCount > 0 {
-					for _, ans := range nsResp.Answers {
-						if ans.Type == clientQuery.Questions[0].Type {
-							hasTargetAnswer = true
-							break
-						}
-					}
-				}
-
-				if hasTargetAnswer || rcode == NXDOMAIN {
-					binary.BigEndian.PutUint16(rootRespBuf[0:2], clientQuery.Header.ID)
-					conn.WriteToUDP(rootRespBuf[:rootN], clientAddr)
-					resolved = true
-					break
-				}
-
-				for _, add := range nsResp.Additionals {
-					if add.Type == 1 && add.RDLength == 4 {
-						nextNS = append(nextNS, net.IP(add.RData).String())
-					}
-				}
-			}
-
-			if resolved {
-				break
-			}
-
-			if len(nextNS) == 0 {
-				break
-			}
-
-			currentNS = nextNS
-		}
-
-		if !resolved {
-			errMsg := buildErrorResponse(clientQuery, SERVFAIL)
-			conn.WriteToUDP(packMessage(errMsg), clientAddr)
-		}
+		resp := resolve(&dialer, clientQuery)
+		_, _ = conn.WriteToUDP(resp, clientAddr)
 	}
 }
