@@ -95,8 +95,8 @@ func buildErrorResponse(clientQuery *dnsMessage, flag uint16) dnsMessage {
 	return dnsMessage{
 		Header: header{
 			ID:       clientQuery.Header.ID,
-			Flags:    flag,
-			QDCount:  1,
+			Flags:    0x8000 | flag,
+			QDCount:  uint16(len(clientQuery.Questions)),
 			ANCount:  0,
 			NSCCount: 0,
 			ARCount:  0,

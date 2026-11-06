@@ -69,18 +69,30 @@ func askDomain(dialer *net.Dialer, timeout context.Context, ns string, question 
 	deadline, _ := timeout.Deadline()
 	conn.SetDeadline(deadline)
 
-	n, err := conn.Write(packMessage(sendMsg(question)))
+	request := sendMsg(question)
+	requestID := request.Header.ID
+
+	n, err := conn.Write(packMessage(request))
 	if err != nil {
 		return nil, nil, err
 	}
 
 	respBuff := make([]byte, 2048)
+
 	n, err = conn.Read(respBuff)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return unpackMessage(respBuff[:n]), respBuff[:n], nil
+	responseID := binary.BigEndian.Uint16(respBuff[:2])
+
+	if responseID != requestID {
+		return nil, nil, fmt.Errorf("ID mismatch")
+	}
+
+	parsed := unpackMessage(respBuff[:n])
+
+	return parsed, respBuff[:n], nil
 }
 
 func isAnswer(answers []resourceRecord, ttype uint16) bool {
