@@ -143,7 +143,7 @@ func resolve(dialer *net.Dialer, clientQuery *dnsMessage) []byte {
 
 func main() {
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{
-		IP:   net.ParseIP("0.0.0.0"),
+		IP:   net.ParseIP("127.0.0.1"),
 		Port: 53,
 	})
 	if err != nil {
