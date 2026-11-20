@@ -6,6 +6,14 @@ import (
 	"syscall"
 )
 
+type tcpParsed struct {
+	SrcPort uint16
+	DstPort uint16
+	SeqNum  uint32
+	AckNum  uint32
+	Flags   uint8
+}
+
 func buildTCPPacket(srcIP, dstIP net.IP, srcPort, dstPort uint16, seq, ack uint32, flags uint8) []byte {
 	packet := make([]byte, 20)
 
@@ -22,20 +30,16 @@ func buildTCPPacket(srcIP, dstIP net.IP, srcPort, dstPort uint16, seq, ack uint3
 	return packet
 }
 
-func parseTCPResponse(buf []byte) (uint16, uint16, bool) {
+func parseTCPResponse(buf []byte) (tcpParsed, bool) {
 	if len(buf) < 20 {
-		return 0, 0, false
+		return tcpParsed{}, false
 	}
 
-	srcPort := binary.BigEndian.Uint16(buf[0:2])
-	dstPort := binary.BigEndian.Uint16(buf[2:4])
-	// seqNum := binary.BigEndian.Uint32(buf[4:8])
-	// ackNum := binary.BigEndian.Uint32(buf[8:12])
-	flags := (buf[13])
-
-	if (flags & (SYN | ACK)) == (SYN | ACK) {
-		return srcPort, dstPort, true
-	}
-
-	return 0, 0, false
+	return tcpParsed{
+		SrcPort: binary.BigEndian.Uint16(buf[0:2]),
+		DstPort: binary.BigEndian.Uint16(buf[2:4]),
+		SeqNum:  binary.BigEndian.Uint32(buf[4:8]),
+		AckNum:  binary.BigEndian.Uint32(buf[8:12]),
+		Flags:   buf[13],
+	}, true
 }

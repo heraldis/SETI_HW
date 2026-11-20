@@ -13,18 +13,18 @@ const (
 )
 
 func getLocalIP(targetIP net.IP) (net.IP, error) {
-	conn, err := net.DialUDP("udp4", nil, &net.UDPAddr{IP: targetIP, Port: 80})
+	c, err := net.DialUDP("udp4", nil, &net.UDPAddr{
+		IP:   targetIP,
+		Port: 9})
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect: %v", err)
+		return nil, err
 	}
-	defer conn.Close()
-
-	localAddr, ok := conn.LocalAddr().(*net.UDPAddr)
-	if !ok || localAddr.IP.To4() == nil {
-		return nil, fmt.Errorf("failed to get local address")
+	defer c.Close()
+	ip := c.LocalAddr().(*net.UDPAddr).IP.To4()
+	if ip == nil {
+		return nil, fmt.Errorf("failed to determine IP")
 	}
-
-	return localAddr.IP.To4(), nil
+	return ip, nil
 }
 
 func getChecksum(srcIP, dstIP net.IP, protocol uint8, segment []byte) uint16 {

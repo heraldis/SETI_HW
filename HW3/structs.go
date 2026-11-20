@@ -6,6 +6,13 @@ import (
 	"time"
 )
 
+type ProtocolType string
+
+const (
+	TCP ProtocolType = "tcp"
+	UDP ProtocolType = "udp"
+)
+
 type tcpHeader struct {
 	SourcePort      uint16
 	DestinationPort uint16
