@@ -85,7 +85,7 @@ func main() {
 	}
 	wg.Wait()
 
-	if cfg.IsVerbose && !hasOpen.Load() {
+	if !hasOpen.Load() {
 		fmt.Fprintln(os.Stderr, "No open ports found.")
 	}
 }
