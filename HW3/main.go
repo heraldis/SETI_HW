@@ -109,7 +109,7 @@ func (s *scanner) runWorker(
 
 		var guessed string
 		if cfg.IsGuess {
-			guessed = "-"
+			guessed = guessProtocol(j.Protocol, s.TargetIP, j.Port, s.Timeout)
 		}
 
 		line := formatOpenPort(j.Protocol, j.Port, cfg.IsVerbose, rtt, cfg.IsGuess, guessed)
