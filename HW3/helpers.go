@@ -6,12 +6,6 @@ import (
 	"net"
 )
 
-const (
-	SYN byte = 0x02
-	RST byte = 0x04
-	ACK byte = 0x10
-)
-
 func getLocalIP(targetIP net.IP) (net.IP, error) {
 	c, err := net.DialUDP("udp4", nil, &net.UDPAddr{
 		IP:   targetIP,

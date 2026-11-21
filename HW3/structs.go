@@ -6,6 +6,12 @@ import (
 	"time"
 )
 
+const (
+	SYN byte = 0x02
+	RST byte = 0x04
+	ACK byte = 0x10
+)
+
 type ProtocolType string
 
 const (

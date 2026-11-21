@@ -153,6 +153,11 @@ func (s *scanner) listenTCP() {
 	}
 }
 
+func (s *scanner) isFromTarget(addr net.Addr) bool {
+	ipAddr, ok := addr.(*net.IPAddr)
+	return ok && ipAddr.IP.To4().Equal(s.TargetIP)
+}
+
 func (s *scanner) listenUDP() {
 	if s.UDPConn == nil {
 		return
@@ -198,12 +203,24 @@ func (s *scanner) listenICMP() {
 	}
 }
 
-func (s *scanner) isFromTarget(addr net.Addr) bool {
-	ipAddr, ok := addr.(*net.IPAddr)
-	return ok && ipAddr.IP.To4().Equal(s.TargetIP)
+func (s *scanner) probePort(protocol ProtocolType, targetPort uint16, measure bool) (string, time.Duration, bool) {
+	if measure {
+		return s.measureRTT(protocol, targetPort)
+	}
+	state, ok := s.scan(protocol, targetPort)
+	return state, 0, ok
 }
 
-func (s *scanner) probePort(protocol ProtocolType, targetPort uint16) (string, bool) {
+func (s *scanner) measureRTT(protocol ProtocolType, targetPort uint16) (string, time.Duration, bool) {
+	start := time.Now()
+	state, ok := s.scan(protocol, targetPort)
+	if !ok {
+		return "", 0, false
+	}
+	return state, time.Since(start), true
+}
+
+func (s *scanner) scan(protocol ProtocolType, targetPort uint16) (string, bool) {
 	localPort := s.nextLocalPort()
 	ch := s.registerWaiter(localPort, targetPort)
 	defer s.unregisterWaiter(localPort)
@@ -212,8 +229,8 @@ func (s *scanner) probePort(protocol ProtocolType, targetPort uint16) (string, b
 
 	switch protocol {
 	case TCP:
-		pkt := buildTCPPacket(s.SourceIP, s.TargetIP, localPort, targetPort, rand.Uint32(), 0, SYN)
-		if _, err := s.TCPConn.WriteTo(pkt, dstAddr); err != nil {
+		packet := buildTCPPacket(s.SourceIP, s.TargetIP, localPort, targetPort, rand.Uint32(), 0, SYN)
+		if _, err := s.TCPConn.WriteTo(packet, dstAddr); err != nil {
 			return "", false
 		}
 	case UDP:
