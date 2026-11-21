@@ -19,18 +19,6 @@ const (
 	UDP ProtocolType = "udp"
 )
 
-type tcpHeader struct {
-	SourcePort      uint16
-	DestinationPort uint16
-	SeqNumber       uint32
-	AckNumber       uint32
-	Offset          uint8
-	Flags           uint8
-	WindowSize      uint16
-	Checksum        uint16
-	UrgentPointer   uint16
-}
-
 type options struct {
 	TargetIP   net.IP
 	Timeout    time.Duration

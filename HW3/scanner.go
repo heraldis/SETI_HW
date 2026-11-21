@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/binary"
 	"math/rand/v2"
 	"net"
 	"sync"
@@ -131,24 +130,26 @@ func (s *scanner) listenTCP() {
 			continue
 		}
 
-		packet := buf[:n]
-		if len(packet) < 20 {
+		packet, ok := parseTCPResponse(buf[:n])
+		if !ok {
 			continue
 		}
 
-		respSrcPort := binary.BigEndian.Uint16(packet[0:2])
-		respDstPort := binary.BigEndian.Uint16(packet[2:4])
-		seqNum := binary.BigEndian.Uint32(packet[4:8])
-		ackNum := binary.BigEndian.Uint32(packet[8:12])
-		flags := packet[13]
-
 		switch {
-		case (flags & (SYN | ACK)) == (SYN | ACK):
-			rst := buildTCPPacket(s.SourceIP, s.TargetIP, respDstPort, respSrcPort, ackNum, seqNum+1, RST)
+		case (packet.Flags & (SYN | ACK)) == (SYN | ACK):
+			rst := buildTCPPacket(
+				s.SourceIP,
+				s.TargetIP,
+				packet.DstPort,
+				packet.SrcPort,
+				packet.AckNum,
+				packet.SeqNum+1,
+				RST,
+			)
 			_, _ = s.TCPConn.WriteTo(rst, dstAddr)
-			s.notifyWaiter(respDstPort, respSrcPort, "open")
-		case (flags & RST) != 0:
-			s.notifyWaiter(respDstPort, respSrcPort, "closed")
+			s.notifyWaiter(packet.DstPort, packet.SrcPort, "open")
+		case (packet.Flags & RST) != 0:
+			s.notifyWaiter(packet.DstPort, packet.SrcPort, "closed")
 		}
 	}
 }
