@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 func main() {
@@ -46,15 +48,21 @@ func main() {
 	}
 	close(jobs)
 
+	var hasOpen atomic.Bool
 	var wg sync.WaitGroup
-	for i := 0; i < max(cfg.NumThreads, 1); i++ {
+	for range max(cfg.NumThreads, 1) {
 		wg.Go(func() {
-			for p := range jobs {
-				if st, ok := s.probePort(p.Protocol, p.Port); ok && st == "open" {
-					fmt.Printf("TCP %v open\n", p)
+			for j := range jobs {
+				if state, ok := s.probePort(j.Protocol, j.Port); ok && state == "open" {
+					hasOpen.Store(true)
+					fmt.Printf("%s %d\n", strings.ToUpper(string(j.Protocol)), j.Port)
 				}
 			}
 		})
 	}
 	wg.Wait()
+
+	if !hasOpen.Load() {
+		fmt.Fprintln(os.Stderr, "No open ports found.")
+	}
 }

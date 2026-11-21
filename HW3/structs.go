@@ -36,7 +36,7 @@ type options struct {
 }
 
 func (o *options) bindFlags(fs *flag.FlagSet, timeoutStr *string) {
-	fs.StringVar(timeoutStr, "timeout", "2s", "timeout")
+	fs.StringVar(timeoutStr, "timeout", "2", "timeout")
 	fs.IntVar(&o.NumThreads, "j", 4, "number of threads")
 	fs.IntVar(&o.NumThreads, "num-threads", 4, "number of threads")
 	fs.BoolVar(&o.IsVerbose, "v", false, "verbose mode")
